@@ -34,6 +34,7 @@ import javax.script.ScriptException;
 import org.littleshoot.proxy.ChainedProxy;
 import org.littleshoot.proxy.ChainedProxyAdapter;
 import org.littleshoot.proxy.ChainedProxyManager;
+import org.littleshoot.proxy.ChainedSocksProxy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +49,12 @@ public class PacProxyManager implements ChainedProxyManager {
 
     private static final String PROXY = "PROXY ";
 
+    private static final String SOCKS = "SOCKS ";
+
+    private static final String SOCKS4 = "SOCKS4 ";
+
+    private static final String SOCKS5 = "SOCKS5 ";
+
     private static final Logger LOG = LoggerFactory.getLogger(PacProxyManager.class);
 
     private ScriptEngine pacScript;
@@ -57,7 +64,7 @@ public class PacProxyManager implements ChainedProxyManager {
     /**
      * Construct a new proxy manager using the given PAC location. This will initialize the Java Nashorn scripting
      * engine with the PAC shim (javaPacShim.js) and the PAC file.
-     * 
+     *
      * @param pacLocation
      * @throws IOException
      * @throws ScriptException
@@ -80,7 +87,7 @@ public class PacProxyManager implements ChainedProxyManager {
     public void lookupChainedProxies(HttpRequest httpRequest, Queue<ChainedProxy> chainedProxies) {
         Invocable invocable = (Invocable) pacScript;
         try {
-            String uri = httpRequest.getUri();
+            String uri = httpRequest.uri();
             String parsedURIHost = getHostFromURI(uri);
             String host = parsedURIHost == null ? uri.split(":")[0] : parsedURIHost;
             String result = (String) invocable.invokeFunction(usePACExtensions ? "FindProxyForURLEx"
@@ -113,31 +120,68 @@ public class PacProxyManager implements ChainedProxyManager {
         if (DIRECT.equals(input)) {
             return ChainedProxyAdapter.FALLBACK_TO_DIRECT_CONNECTION;
         }
-        if (input.length() > PROXY.length() && input.startsWith(PROXY)) {
+        boolean socks = false;
+        boolean socks5 = false;
+        socks5 = largerAndStartsWith(input, SOCKS5);
+        socks = socks5 || largerAndStartsWith(input, SOCKS) || largerAndStartsWith(input, SOCKS4);
+        if (socks || largerAndStartsWith(input, PROXY)) {
             // TODO IPv6
-            String[] proxy = input.substring(PROXY.length()).split(":");
+            String[] proxy = input.substring(input.indexOf(' ') + 1).split(":");
             if (proxy.length != 2) {
-                LOG.error("Malformed PROXY value returned: " + input);
+                LOG.error("Malformed proxy address value returned: " + input);
                 return null;
             }
-            return new PacProxy(new InetSocketAddress(proxy[0], Integer.parseInt(proxy[1])));
+            PacProxy proxyDescription = new PacProxy(new InetSocketAddress(proxy[0], Integer.parseInt(proxy[1])));
+            proxyDescription.setSocks(socks);
+            proxyDescription.setSocks5(socks5);
+            return proxyDescription;
         }
-        // TODO support SOCKS
         LOG.error("Illegal value returned by FindProxyForURL: " + input);
         return null;
     }
 
-    private static class PacProxy extends ChainedProxyAdapter {
+    private static boolean largerAndStartsWith(String string, String prefix) {
+        return string.length() > prefix.length() && string.startsWith(prefix);
+    }
+
+    private static class PacProxy extends ChainedProxyAdapter implements ChainedSocksProxy {
 
         private InetSocketAddress proxyAddress;
 
-        public PacProxy(InetSocketAddress proxyAddress) {
+        private boolean socks;
+
+        private boolean socks5;
+
+        PacProxy(InetSocketAddress proxyAddress) {
             this.proxyAddress = proxyAddress;
+        }
+
+        void setSocks(boolean socks) {
+            this.socks = socks;
+        }
+
+        void setSocks5(boolean socks5) {
+            this.socks5 = socks5;
         }
 
         @Override
         public InetSocketAddress getChainedProxyAddress() {
             return proxyAddress;
+        }
+
+        @Override
+        public boolean isSocksProxy() {
+            return socks;
+        }
+
+        @Override
+        public boolean isSocks5Proxy() {
+            return socks5;
+        }
+
+        @Override
+        public boolean useSocks5Resolver() {
+            return true;
         }
     }
 
