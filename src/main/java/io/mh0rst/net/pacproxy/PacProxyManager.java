@@ -29,7 +29,6 @@ import java.util.Queue;
 
 import javax.script.Invocable;
 import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 import org.littleshoot.proxy.ChainedProxy;
@@ -62,12 +61,11 @@ public class PacProxyManager implements ChainedProxyManager {
      * @throws ScriptException
      */
     public PacProxyManager(String pacLocation) throws IOException, ScriptException {
-        ScriptEngineManager engineManager = new ScriptEngineManager();
-        pacScript = engineManager.getEngineByName("nashorn");
-        try (Reader reader = new InputStreamReader(PacProxyManager.class.getResourceAsStream("/javaPacShim.js"),
-                                                   StandardCharsets.UTF_8);
+        pacScript = SecureScriptEngine.newNashornEngine();
+        try (Reader shim = new InputStreamReader(PacProxyManager.class.getResourceAsStream("/javaPacShim.js"),
+                                                 StandardCharsets.UTF_8);
              Reader pacReader = new FileReader(pacLocation)) {
-            pacScript.eval(reader);
+            pacScript.eval(shim);
             pacScript.eval(pacReader);
         }
     }
@@ -83,9 +81,11 @@ public class PacProxyManager implements ChainedProxyManager {
             String parsedURIHost = getHostFromURI(uri);
             String host = parsedURIHost == null ? uri.split(":")[0] : parsedURIHost;
             String result = (String) invocable.invokeFunction("FindProxyForURL", uri, host);
-            ChainedProxy proxy = fromPACString(result);
-            if (proxy != null) {
-                chainedProxies.add(proxy);
+            for (String proxyEntry : result.split(";")) {
+                ChainedProxy proxy = fromPACString(proxyEntry.trim());
+                if (proxy != null) {
+                    chainedProxies.add(proxy);
+                }
             }
         } catch (NoSuchMethodException | ScriptException e) {
             LOG.error("Error while executing FindProxyForURL", e);
@@ -102,10 +102,14 @@ public class PacProxyManager implements ChainedProxyManager {
     }
 
     private ChainedProxy fromPACString(String input) {
+        if (input.isEmpty()) {
+            return null;
+        }
         if (DIRECT.equals(input)) {
             return ChainedProxyAdapter.FALLBACK_TO_DIRECT_CONNECTION;
         }
         if (input.length() > PROXY.length() && input.startsWith(PROXY)) {
+            // TODO IPv6
             String[] proxy = input.substring(PROXY.length()).split(":");
             if (proxy.length != 2) {
                 LOG.error("Malformed PROXY value returned: " + input);
@@ -113,6 +117,7 @@ public class PacProxyManager implements ChainedProxyManager {
             }
             return new PacProxy(new InetSocketAddress(proxy[0], Integer.parseInt(proxy[1])));
         }
+        // TODO support SOCKS
         LOG.error("Illegal value returned by FindProxyForURL: " + input);
         return null;
     }
