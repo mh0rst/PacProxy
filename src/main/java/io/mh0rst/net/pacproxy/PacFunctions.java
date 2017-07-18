@@ -168,13 +168,14 @@ public class PacFunctions {
         }
         try {
             for (NetworkInterface iface : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                if (iface.isLoopback()) {
+                    continue;
+                }
                 Enumeration<InetAddress> inetAddresses = iface.getInetAddresses();
-                if (!iface.isLoopback()) {
-                    while (inetAddresses.hasMoreElements()) {
-                        InetAddress ifaceAddress = inetAddresses.nextElement();
-                        if (!ifaceAddress.isLinkLocalAddress() && !(ifaceAddress instanceof Inet6Address)) {
-                            return ifaceAddress.getHostAddress();
-                        }
+                while (inetAddresses.hasMoreElements()) {
+                    InetAddress ifaceAddress = inetAddresses.nextElement();
+                    if (!ifaceAddress.isLinkLocalAddress() && !(ifaceAddress instanceof Inet6Address)) {
+                        return ifaceAddress.getHostAddress();
                     }
                 }
             }
@@ -182,6 +183,33 @@ public class PacFunctions {
             LOG.warn("Could not resolve own IP address", e);
         }
         return address == null ? "" : address;
+    }
+
+    /**
+     * Attempts to detect all IP addresses of the machine running this proxy.
+     */
+    public static String myIpAddressEx() {
+        StringBuilder addresses = new StringBuilder();
+        try {
+            for (NetworkInterface iface : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                if (iface.isLoopback()) {
+                    continue;
+                }
+                Enumeration<InetAddress> inetAddresses = iface.getInetAddresses();
+                while (inetAddresses.hasMoreElements()) {
+                    InetAddress ifaceAddress = inetAddresses.nextElement();
+                    if (!ifaceAddress.isLinkLocalAddress()) {
+                        if (addresses.length() > 0) {
+                            addresses.append(';');
+                        }
+                        addresses.append(ifaceAddress.getHostAddress());
+                    }
+                }
+            }
+        } catch (SocketException e) {
+            LOG.warn("Could not resolve own IP address", e);
+        }
+        return addresses.toString();
     }
 
     /**
@@ -195,9 +223,6 @@ public class PacFunctions {
         return str != null && shexp != null &&
                str.matches(shexp.replace(".", "\\.").replace("?", ".?").replace("*", ".*"));
     }
-
-    // TODO support Extensions:
-    // https://blogs.msdn.microsoft.com/wndp/2006/07/13/extensions-to-the-navigator-proxy-auto-config-file-format-specification-to-support-ipv6-v0-9/
 
     private static boolean nullOrEmpty(String host) {
         return host == null || host.isEmpty();

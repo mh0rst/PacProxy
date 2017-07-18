@@ -52,6 +52,8 @@ public class PacProxyManager implements ChainedProxyManager {
 
     private ScriptEngine pacScript;
 
+    private boolean usePACExtensions;
+
     /**
      * Construct a new proxy manager using the given PAC location. This will initialize the Java Nashorn scripting
      * engine with the PAC shim (javaPacShim.js) and the PAC file.
@@ -67,6 +69,7 @@ public class PacProxyManager implements ChainedProxyManager {
              Reader pacReader = new FileReader(pacLocation)) {
             pacScript.eval(shim);
             pacScript.eval(pacReader);
+            usePACExtensions = pacScript.get("FindProxyForURLEx") != null;
         }
     }
 
@@ -80,7 +83,9 @@ public class PacProxyManager implements ChainedProxyManager {
             String uri = httpRequest.getUri();
             String parsedURIHost = getHostFromURI(uri);
             String host = parsedURIHost == null ? uri.split(":")[0] : parsedURIHost;
-            String result = (String) invocable.invokeFunction("FindProxyForURL", uri, host);
+            String result = (String) invocable.invokeFunction(usePACExtensions ? "FindProxyForURLEx"
+                                                                               : "FindProxyForURL",
+                                                              uri, host);
             for (String proxyEntry : result.split(";")) {
                 ChainedProxy proxy = fromPACString(proxyEntry.trim());
                 if (proxy != null) {

@@ -42,3 +42,30 @@ function myIpAddress() {
 function shExpMatch(str, shexp) {
 	return PacFunctions.shExpMatch(str, shexp);
 }
+
+// Start of PAC extensions
+// https://blogs.msdn.microsoft.com/wndp/2006/07/13/extensions-to-the-navigator-proxy-auto-config-file-format-specification-to-support-ipv6-v0-9/
+
+function isResolvableEx(host) {
+	return PacFunctions.isResolvable(host);
+}
+
+function isInNetEx(address, prefix) {
+	// TODO
+}
+
+function dnsResolveEx(host) {
+	// TODO
+}
+
+function myIPAddressEx() {
+	return PacFunctions.myIpAddressEx();
+}
+
+function sortIpAddressList(addressList) {
+	// TODO
+}
+
+function getClientVersion() {
+	return 1.0;
+}
