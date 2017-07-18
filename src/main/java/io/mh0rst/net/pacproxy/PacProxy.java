@@ -78,6 +78,10 @@ public class PacProxy {
     }
 
     private void parseArguments(String[] args) {
+        if (args.length == 0) {
+            printHelp();
+            System.exit(0);
+        }
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
             case "-b":
