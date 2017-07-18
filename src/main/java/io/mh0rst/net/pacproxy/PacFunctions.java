@@ -17,6 +17,7 @@
  */
 package io.mh0rst.net.pacproxy;
 
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -120,7 +121,7 @@ public class PacFunctions {
     }
 
     /**
-     * Returns true if the resolved IP address of the given host name is part of the subnet denoted by the pattern and
+     * Returns true if the resolved IPv4 address of the given host name is part of the subnet denoted by the pattern and
      * the mask.
      * 
      * @param host A host name or IP address
@@ -153,14 +154,13 @@ public class PacFunctions {
     }
 
     /**
-     * Attempts to detect the IP address of the machine running this proxy.
+     * Attempts to detect the IPv4 address of the machine running this proxy.
      */
     public static String myIpAddress() {
         String address = null;
         try {
             address = InetAddress.getLocalHost().getHostAddress();
-            if (!address.startsWith("127")) // TODO IPv6?
-            {
+            if (!address.startsWith("127")) {
                 return address;
             }
         } catch (UnknownHostException e) {
@@ -172,8 +172,7 @@ public class PacFunctions {
                 if (!iface.isLoopback()) {
                     while (inetAddresses.hasMoreElements()) {
                         InetAddress ifaceAddress = inetAddresses.nextElement();
-                        // TODO remove ugly anti docker interface hack.
-                        if (!ifaceAddress.isLinkLocalAddress() && !ifaceAddress.getHostAddress().startsWith("172.17")) {
+                        if (!ifaceAddress.isLinkLocalAddress() && !(ifaceAddress instanceof Inet6Address)) {
                             return ifaceAddress.getHostAddress();
                         }
                     }
@@ -196,6 +195,9 @@ public class PacFunctions {
         return str != null && shexp != null &&
                str.matches(shexp.replace(".", "\\.").replace("?", ".?").replace("*", ".*"));
     }
+
+    // TODO support Extensions:
+    // https://blogs.msdn.microsoft.com/wndp/2006/07/13/extensions-to-the-navigator-proxy-auto-config-file-format-specification-to-support-ipv6-v0-9/
 
     private static boolean nullOrEmpty(String host) {
         return host == null || host.isEmpty();
