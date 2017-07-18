@@ -17,6 +17,7 @@
  */
 package io.mh0rst.net.pacproxy;
 
+import javax.script.Bindings;
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 
@@ -32,7 +33,9 @@ public class SecureScriptEngine {
     static ScriptEngine newNashornEngine() {
         NashornScriptEngineFactory factory = new NashornScriptEngineFactory();
         ScriptEngine scriptEngine = factory.getScriptEngine(new PacClassFilter());
-        scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE).remove("quit");
+        Bindings bindings = scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
+        bindings.remove("exit");
+        bindings.remove("quit");
         return scriptEngine;
     }
 
